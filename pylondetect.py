@@ -56,12 +56,12 @@ class PylonImage:
         return self.__image__
 
 
-def load_actual_count(path):
+def load_actual_count(actualTxtPath):
     """ Returns a dictionary of { filename: actual count, ... } """
 
     name_count = {}
 
-    with open(os.path.join(path,'actual.txt'), 'r') as actual_file:
+    with open(actualTxtPath, 'r') as actual_file:
         for line_no, line in enumerate(actual_file):
             line_parts = line.split(';')
 
@@ -73,18 +73,21 @@ def load_actual_count(path):
     return name_count
 
 
-def pylon_images_from_folder(path):
+def pylon_images_from_folder(imgDirPath, actualTxtPath):
     """ Returns a list of PylonImages """
 
     pylon_images = []
 
-    actual_counts = load_actual_count(path)
+    actual_counts = load_actual_count(actualTxtPath)
 
-    for filename in os.listdir(path):
+    for filename in os.listdir(imgDirPath):
 
         if filename.endswith(".png"):
             try:
-                pylon_images.append(PylonImage(os.path.join(path, filename), actual_counts[filename]))
+                if (filename in actual_counts):
+                    pylon_images.append(PylonImage(os.path.join(imgDirPath, filename), actual_counts[filename]))
+                else:
+                    pylon_images.append(PylonImage(os.path.join(imgDirPath, filename), 'unknown'))
             except (ValueError, SyntaxError):
                 print ("Failed to create PylonImage from %s" % filename)
         else:
@@ -103,29 +106,36 @@ if __name__ == '__main__':
     parser.add_argument('--verify', action='store_const', const=True, help='''Compares the number of detected pylons in an image with the actual number of pylons.
         The actual number of pylons is read from path/actual.txt, which contains one file per line.
         The filename and the number of pylons is separated by a semicolon.''')
-    parser.add_argument('Path', nargs=1, help='The path to the image files.')
+    parser.add_argument('Paths', nargs=2, help='The path to the image files and actual.txt.')
 
     args = parser.parse_args()
 
-    path = args.Path[0]
+    imgDirPath = args.Paths[0]
+    actualTxtPath = args.Paths[1]
 
-    if not os.path.exists(path) or not os.path.isdir(path):
+    if not os.path.exists(imgDirPath) or not os.path.isdir(imgDirPath):
 
-        print("Path does not exist!")
+        print("Path to image files does not exist!")
+        sys.exit(1)
+
+    if not os.path.exists(actualTxtPath):
+
+        print("Path to actual.txt does not exist!")
         sys.exit(1)
 
     print('Creating PylonImages...')
 
-    pylon_images = pylon_images_from_folder(path)
+    pylon_images = pylon_images_from_folder(imgDirPath, actualTxtPath)
 
-    print(pylon_images)
+    for i in range(len(pylon_images)):
+        print(pylon_images[i].__filename__ + ':' + pylon_images[i].__actual_count__)
 
     # TODO iterate over files and detect and store result in list
 
     if args.verify:
 
         # TODO read verify file
-        name_actual_count = load_actual_count(path)
+        name_actual_count = load_actual_count(imgDirPath)
 
         # TODO show success rate and print detection errors
 
