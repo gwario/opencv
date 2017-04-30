@@ -115,7 +115,7 @@ def pylon_images_from_folder(imgDirPath, actualTxtPath):
         else:
             print('Skipping ', filename)
 
-    print(len(pylon_images), ' PylonImages create.')
+    print(len(pylon_images), 'PylonImages processed.')
 
     return pylon_images
 
@@ -145,12 +145,13 @@ if __name__ == '__main__':
         print("Path to actual.txt does not exist!")
         sys.exit(1)
 
-    print('Creating PylonImages...')
+    print('Processing PylonImages...')
 
     pylon_images = pylon_images_from_folder(imgDirPath, actualTxtPath)
 
     for i in range(len(pylon_images)):
-        print(pylon_images[i].__filename__ + ':', pylon_images[i].__actual_count__)
+        if pylon_images[i].__actual_count__ > 0:
+            print(pylon_images[i].__filename__ + ':', pylon_images[i].__actual_count__)
 
     # TODO iterate over files and detect and store result in list
 

@@ -6,7 +6,7 @@
 
 ## Usage
 
-`python2 pylondetect.py /path/to/immage/dir /path/to/actual.txt`
+`python2 pylondetect.py /path/to/image/dir /path/to/actual.txt`
 
 ## Ressources
 https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_tutorials.html
