@@ -55,6 +55,28 @@ class PylonImage:
     def get_image(self):
         return self.__image__
 
+def match_templates(image):
+    "Compares image to list of template images and returns the matches"
+    numberOfDetections = 0
+
+    for template in os.listdir("templates"):
+
+        if (template.endswith(".png")):
+            img_gray = cv2.cvtColor(image.__image__, cv2.COLOR_BGR2GRAY)
+            template_gray = cv2.cvtColor(cv2.imread(os.path.join("templates", template)), cv2.COLOR_BGR2GRAY)
+
+            res = cv2.matchTemplate(img_gray, template_gray, cv2.TM_CCOEFF_NORMED)
+            threshold = 0.8
+            loc = np.where(res >= threshold)
+
+            for pt in zip(*loc[::-1]):
+                numberOfDetections += 1
+                #cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,255,255), 2)
+        else:
+            print("Skipping file " + template)
+
+    return numberOfDetections
+
 
 def load_actual_count(actualTxtPath):
     """ Returns a dictionary of { filename: actual count, ... } """
@@ -84,10 +106,10 @@ def pylon_images_from_folder(imgDirPath, actualTxtPath):
 
         if filename.endswith(".png"):
             try:
-                if (filename in actual_counts):
-                    pylon_images.append(PylonImage(os.path.join(imgDirPath, filename), actual_counts[filename]))
-                else:
-                    pylon_images.append(PylonImage(os.path.join(imgDirPath, filename), 'unknown'))
+                pylonImage = PylonImage(os.path.join(imgDirPath, filename), 0)
+                pylonImage.__actual_count__ = match_templates(pylonImage)
+                pylon_images.append(pylonImage)
+
             except (ValueError, SyntaxError):
                 print ("Failed to create PylonImage from %s" % filename)
         else:
@@ -128,7 +150,7 @@ if __name__ == '__main__':
     pylon_images = pylon_images_from_folder(imgDirPath, actualTxtPath)
 
     for i in range(len(pylon_images)):
-        print(pylon_images[i].__filename__ + ':' + pylon_images[i].__actual_count__)
+        print(pylon_images[i].__filename__ + ':', pylon_images[i].__actual_count__)
 
     # TODO iterate over files and detect and store result in list
 
