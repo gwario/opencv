@@ -33,18 +33,19 @@ class PylonImage:
 
     __filename__ = ""
     __image__ = None
-    __actual_count__ = 0
-    __supposed_count__ = 0
+    __actual_count__ = None
+    __supposed_count__ = None
 
-    def __init__(self, filename, actual_count):
+    def __init__(self, filename, actual_count=None):
 
         if filename != "":
             self.__filename__ = filename
 
-        if actual_count >= 0:
-            self.__actual_count__ = actual_count
-        else:
-            raise ValueError("Actual pylon count must be greater or equal to zero.")
+        if actual_count is not None:
+            if actual_count >= 0:
+                self.__actual_count__ = actual_count
+            else:
+                raise ValueError("Actual pylon count must be greater or equal to zero.")
 
         image = cv2.imread(self.__filename__)
         if image is not None:
@@ -52,8 +53,32 @@ class PylonImage:
         else:
             raise ValueError("Invalid file.")
 
+    def get_filename(self):
+        return self.__filename__
+
     def get_image(self):
         return self.__image__
+
+    def set_supposed_count(self, count):
+        if count >= 0:
+            self.__supposed_count__ = count
+        else:
+            raise ValueError("Pylon count must be greater or equal to zero.")
+
+    def get_supposed_count(self):
+        return self.__supposed_count__
+
+    def set_actual_count(self, count):
+        if count >= 0:
+            self.__actual_count__ = count
+        else:
+            raise ValueError("Pylon count must be greater or equal to zero.")
+
+    def get_actual_count(self):
+        return self.__actual_count__
+
+    def correctly_recognized(self):
+        return self.__supposed_count__ is not None and self.__actual_count__  is not None and self.__supposed_count__ == self.__actual_count__
 
 
 def match_templates(image):
@@ -79,12 +104,12 @@ def match_templates(image):
     return numberOfDetections
 
 
-def load_actual_count(actualTxtPath):
+def load_actual_count(actual_txt_file_path):
     """ Returns a dictionary of { filename: actual count, ... } """
 
     name_count = {}
 
-    with open(actualTxtPath, 'r') as actual_file:
+    with open(actual_txt_file_path, 'r') as actual_file:
         for line_no, line in enumerate(actual_file):
             line_parts = line.split(';')
 
@@ -96,19 +121,24 @@ def load_actual_count(actualTxtPath):
     return name_count
 
 
-def pylon_images_from_folder(imgDirPath, actualTxtPath):
+def pylon_images_from_folder(imgDirPath, actual_txt_file_path):
     """ Returns a list of PylonImages """
 
     pylon_images = []
 
-    actual_counts = load_actual_count(actualTxtPath)
+    actual_counts = {}
+    if actual_txt_file_path is not None:
+        actual_counts = load_actual_count(actual_txt_file_path)
 
     for filename in os.listdir(imgDirPath):
 
         if filename.endswith(".png"):
             try:
                 pylonImage = PylonImage(os.path.join(imgDirPath, filename), 0)
-                pylonImage.__actual_count__ = match_templates(pylonImage)
+
+                if filename in actual_counts:
+                    pylonImage.set_actual_count(actual_counts[filename])
+
                 pylon_images.append(pylonImage)
 
             except (ValueError, SyntaxError):
@@ -126,44 +156,63 @@ if __name__ == '__main__':
     import sys, os, argparse
 
     parser = argparse.ArgumentParser(description='This program detects pylons within images.')
-    parser.add_argument('--verify', action='store_const', const=True, help='''Compares the number of detected pylons in an image with the actual number of pylons.
-        The actual number of pylons is read from path/actual.txt, which contains one file per line.
+    parser.add_argument('--actual', help='''Compares the number of detected pylons in an image with the actual number of pylons.
+        The actual number of pylons is read from the file <ACTUAL>, which contains one file per line.
         The filename and the number of pylons is separated by a semicolon.''')
-    parser.add_argument('Paths', nargs=2, help='The path to the image files and actual.txt.')
+    parser.add_argument('imagePath', nargs=1, help='The path to the image files.')
 
     args = parser.parse_args()
 
-    imgDirPath = args.Paths[0]
-    actualTxtPath = args.Paths[1]
+    imgDirPath = args.imagePath[0]
+    actualTxtFilePath = args.actual
+
+    print(args)
 
     if not os.path.exists(imgDirPath) or not os.path.isdir(imgDirPath):
 
         print("Path to image files does not exist!")
         sys.exit(1)
 
-    if not os.path.exists(actualTxtPath):
+    if actualTxtFilePath is None or not os.path.exists(actualTxtFilePath) or not os.path.isfile(actualTxtFilePath):
 
-        print("Path to actual.txt does not exist!")
+        print("<ACTUAL> does not exist!")
         sys.exit(1)
 
     print('Processing PylonImages...')
 
-    pylon_images = pylon_images_from_folder(imgDirPath, actualTxtPath)
+    pylon_images = pylon_images_from_folder(imgDirPath, actualTxtFilePath)
 
-    for i in range(len(pylon_images)):
-        if pylon_images[i].__actual_count__ > 0:
-            print(pylon_images[i].__filename__ + ':', pylon_images[i].__actual_count__)
+    print('Analyzing...')
 
-    # TODO iterate over files and detect and store result in list
+    for pylonImage in pylon_images:
+        # analyze image
+        pylonImage.set_supposed_count(match_templates(pylonImage))
+        # write result to stdout TODO implement the required format
+        #print(pylonImage.get_filename() + ':', pylonImage.get_supposed_count())
 
-    if args.verify:
+    print('Generating result...')
 
-        # TODO read verify file
-        name_actual_count = load_actual_count(imgDirPath)
+    # show success rate and print detection errors
+    existingPylons = 0
+    foundPylons = 0
 
-        # TODO show success rate and print detection errors
+    for pylonImage in pylon_images:
+        foundPylons += pylonImage.get_supposed_count()
 
+        if actualTxtFilePath is not None:
+            existingPylons += pylonImage.get_actual_count()
+
+            if pylonImage.correctly_recognized():
+                print(pylonImage.get_filename(), ": All pylons were detected.")
+            else:
+                print(pylonImage.get_filename(), "contains", pylonImage.get_actual_count(), "pylons,", pylonImage.get_supposed_count(), "were detected.")
+
+        else:
+            print(pylonImage.get_filename(), ":", pylonImage.get_supposed_count(), "pylons were detected.")
+
+    if actualTxtFilePath is not None:
+        print("Overall result:", foundPylons, "of", existingPylons, "detected.")
     else:
+        print("Overall result:", foundPylons, "pylons detected.")
 
-        print('result')
-        # TODO show results
+
