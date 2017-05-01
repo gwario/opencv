@@ -7,7 +7,7 @@ Authors: Mario Gastegger, Felix Meiners
 
 
 
-usage: pylondetect.py [-h] [--verify] Path
+usage: pylondetect.py [-h] [--actual Actual] Path
 
 --verify:   Compares the number of detected pylons in an image with the actual number of pylons.
             The actual number of pylons is read from path/actual.txt
