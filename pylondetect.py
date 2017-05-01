@@ -55,6 +55,7 @@ class PylonImage:
     def get_image(self):
         return self.__image__
 
+
 def match_templates(image):
     "Compares image to list of template images and returns the matches"
     numberOfDetections = 0
