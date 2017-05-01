@@ -33,18 +33,15 @@ class PylonImage:
 
     __filename__ = ""
     __image__ = None
-    __actual_count__ = 0
-    __supposed_count__ = 0
+    __actual_count__ = []
+    __supposed_count__ = []
 
     def __init__(self, filename, actual_count):
 
         if filename != "":
             self.__filename__ = filename
 
-        if actual_count >= 0:
-            self.__actual_count__ = actual_count
-        else:
-            raise ValueError("Actual pylon count must be greater or equal to zero.")
+        self.__actual_count__ = actual_count
 
         image = cv2.imread(self.__filename__)
         if image is not None:
@@ -56,8 +53,11 @@ class PylonImage:
         return self.__image__
 
 def match_templates(image):
-    "Compares image to list of template images and returns the matches"
-    numberOfDetections = 0
+    '''
+    Compares image to list of template images and returns the coordinates in case of match
+    and an empty list if no template matched
+    '''
+    matches = []
 
     for template in os.listdir("templates"):
 
@@ -65,17 +65,15 @@ def match_templates(image):
             img_gray = cv2.cvtColor(image.__image__, cv2.COLOR_BGR2GRAY)
             template_gray = cv2.cvtColor(cv2.imread(os.path.join("templates", template)), cv2.COLOR_BGR2GRAY)
 
-            res = cv2.matchTemplate(img_gray, template_gray, cv2.TM_CCOEFF_NORMED)
-            threshold = 0.8
-            loc = np.where(res >= threshold)
+            result = cv2.matchTemplate(img_gray, template_gray, cv2.TM_CCOEFF_NORMED)
+            threshold = 0.9
+            loc = np.where(result >= threshold)
+            matches = zip(*loc[::-1])
 
-            for pt in zip(*loc[::-1]):
-                numberOfDetections += 1
-                #cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,255,255), 2)
         else:
             print("Skipping file " + template)
 
-    return numberOfDetections
+    return matches
 
 
 def load_actual_count(actualTxtPath):
@@ -150,9 +148,9 @@ if __name__ == '__main__':
     pylon_images = pylon_images_from_folder(imgDirPath, actualTxtPath)
 
     for i in range(len(pylon_images)):
-        if pylon_images[i].__actual_count__ > 0:
-            print(pylon_images[i].__filename__ + ':', pylon_images[i].__actual_count__)
-
+        if len(pylon_images[i].__actual_count__) > 0:
+            print(pylon_images[i].__filename__ + ':\t' + "".join([str(x) for x in pylon_images[i].__actual_count__]))
+#.join(str(x) for x in pylon_images[i].__actual_count__)
     # TODO iterate over files and detect and store result in list
 
     if args.verify:
