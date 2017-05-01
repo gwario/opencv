@@ -121,7 +121,7 @@ def load_actual_count(actual_txt_file_path):
     return name_count
 
 
-def pylon_images_from_folder(imgDirPath, actual_txt_file_path):
+def pylon_images_from_folder(img_dir_path, actual_txt_file_path):
     """ Returns a list of PylonImages """
 
     pylon_images = []
@@ -134,7 +134,7 @@ def pylon_images_from_folder(imgDirPath, actual_txt_file_path):
 
         if filename.endswith(".png"):
             try:
-                pylonImage = PylonImage(os.path.join(imgDirPath, filename), 0)
+                pylonImage = PylonImage(os.path.join(img_dir_path, filename), 0)
 
                 if filename in actual_counts:
                     pylonImage.set_actual_count(actual_counts[filename])
