@@ -21,127 +21,10 @@ Path:       The path to the image files.
 # Python 2/3 compatibility
 from __future__ import print_function
 
-import cv2
-import numpy as np
-
-
-class PylonImage:
-    """
-    This class represents a pylon image.
-    It contains information on the number and position of pylons
-    """
-
-    __filename__ = ""
-    __image__ = None
-    __matches__ = None
-    __actual_count__ = None
-    __supposed_count__ = None
-
-    def __init__(self, filename, actual_count=None):
-
-        if filename != "":
-            self.__filename__ = filename
-
-        if actual_count is not None:
-            if actual_count >= 0:
-                self.__actual_count__ = actual_count
-            else:
-                raise ValueError("Actual pylon count must be greater or equal to zero.")
-
-        image = cv2.imread(self.__filename__)
-        if image is not None:
-            self.__image__ = image
-        else:
-            raise ValueError("Invalid file.")
-
-    def get_filename(self):
-        return self.__filename__
-
-    def get_image(self):
-        return self.__image__
-
-    def set_matches(self, matches):
-        self.__matches__ = matches
-
-    def get_matches(self):
-        return self.__matches__
-
-    def set_supposed_count(self, count):
-        if count >= 0:
-            self.__supposed_count__ = count
-        else:
-            raise ValueError("Pylon count must be greater or equal to zero.")
-
-    def get_supposed_count(self):
-        return self.__supposed_count__
-
-    def set_actual_count(self, count):
-        if count >= 0:
-            self.__actual_count__ = count
-        else:
-            raise ValueError("Pylon count must be greater or equal to zero.")
-
-    def get_actual_count(self):
-        return self.__actual_count__
-
-    def correctly_recognized(self):
-        return self.__supposed_count__ is not None and self.__actual_count__  is not None and self.__supposed_count__ == self.__actual_count__
-
-
-def match_templates(image):
-    '''
-    Compares image to list of template images and returns the top left coordinates of the matches
-    and an empty list if no template matched
-    '''
-    matches = []
-
-    for template in os.listdir("templates"):
-        img_rgb = image.get_image()
-
-        if (template.endswith(".png")):
-            # load images and convert to grayscale
-            img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
-            template_gray = cv2.cvtColor(cv2.imread(os.path.join("templates", template)), cv2.COLOR_BGR2GRAY)
-
-            # scale template from 0.3 to 1.5 in alternating order and perform matching
-            scale_factors = [1.0, 0.9, 1.1, 0.8, 1.2, 0.7, 1.3, 0.6, 1.4, 0.5, 0.4, 0.3]
-            scaled_templates = [cv2.resize(template_gray, (0,0), fx=x, fy=x) for x in scale_factors]
-
-            for current_template in scaled_templates:
-                # store variables for rectangles drawn later
-                w, h = current_template.shape[::-1]
-
-                # actual template matching
-                result = cv2.matchTemplate(img_gray, current_template, cv2.TM_CCOEFF_NORMED)
-
-                # remove all matches with too low of a matching score
-                threshold = 0.7
-                loc = np.where(result >= threshold)
-                top_matches = zip(*loc[::-1])
-
-                # draw rectangle at position of first match
-                if len(top_matches) > 0:
-                    for pt in top_matches:
-                        matches += [pt]
-                        cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,255,255), 2)
-                        break #break after first point
-
-                break #break after first success
-
-        else:
-            print("Skipping file " + template)
-
-    # if matching was successful write image with rectangles to file
-    if (len(matches) > 0):
-        dir = "detected"
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-
-        file_name = "detected/matched_" + image.get_filename().split('/')[-1]
-        cv2.imwrite(file_name, img_rgb)
-        print("Match found for " + image.__filename__)
-
-    return matches
+import match_color
+import match_templates
+import pylon_image
+import shutil
 
 
 def load_actual_count(actual_txt_file):
@@ -173,7 +56,7 @@ def pylon_images_from_folder(img_dir_path, actual_txt_file):
 
         if filename.endswith(".png"):
             try:
-                pylonImage = PylonImage(os.path.join(img_dir_path, filename), 0)
+                pylonImage = pylon_image.PylonImage(os.path.join(img_dir_path, filename), 0)
 
                 if filename in actual_counts:
                     pylonImage.set_actual_count(actual_counts[filename])
@@ -205,12 +88,19 @@ if __name__ == '__main__':
     imgDirPath = args.imagePath[0]
     actualTxtFilePath = args.actual
 
-    print(args)
+    #print(args)
 
     if not os.path.exists(imgDirPath) or not os.path.isdir(imgDirPath):
 
         print("Path to image files does not exist!")
         sys.exit(1)
+
+    dir = "detected"
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    else:
+        shutil.rmtree(dir)
+        os.makedirs(dir)
 
     print('Processing PylonImages...')
 
@@ -220,9 +110,9 @@ if __name__ == '__main__':
 
     for pylonImage in pylon_images:
         # analyze image
-        pylonImage.set_matches(match_templates(pylonImage))
+        #pylonImage.set_matches(match_templates.match_templates(pylonImage))
+        pylonImage.set_matches(match_color.match_color(pylonImage))
         pylonImage.set_supposed_count(len(pylonImage.get_matches()))
-        # write result to stdout TODO implement the required format
         #print(pylonImage.get_filename() + ':', pylonImage.get_supposed_count())
 
     print('Generating result...')

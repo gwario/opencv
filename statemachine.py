@@ -100,8 +100,8 @@ class MatchSearcher(object):
         if self.matchEnd is None:
             self.matchEnd = self.currentPos
 
-        print("Start:", self.matchStart)
-        print("End:", self.matchEnd)
+        #print("Start:", self.matchStart)
+        #print("End:", self.matchEnd)
         self.matches.append([self.matchStart, self.matchEnd])
         self.currentPos = None
         self.matchStart = None
