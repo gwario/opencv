@@ -3,7 +3,7 @@
 '''
 This program detects pylons within images.
 
-Authors: Mario Gastegger, Felix Meiners
+Authors: Mario Gastegger, Fritz Meiners
 
 
 
@@ -33,6 +33,7 @@ class PylonImage:
 
     __filename__ = ""
     __image__ = None
+    __matches__ = None
     __actual_count__ = None
     __supposed_count__ = None
 
@@ -59,6 +60,12 @@ class PylonImage:
     def get_image(self):
         return self.__image__
 
+    def set_matches(self, matches):
+        self.__matches__ = matches
+
+    def get_matches(self):
+        return self.__matches__
+
     def set_supposed_count(self, count):
         if count >= 0:
             self.__supposed_count__ = count
@@ -82,26 +89,59 @@ class PylonImage:
 
 
 def match_templates(image):
-    "Compares image to list of template images and returns the matches"
-    numberOfDetections = 0
+    '''
+    Compares image to list of template images and returns the top left coordinates of the matches
+    and an empty list if no template matched
+    '''
+    matches = []
 
     for template in os.listdir("templates"):
+        img_rgb = image.get_image()
 
         if (template.endswith(".png")):
-            img_gray = cv2.cvtColor(image.__image__, cv2.COLOR_BGR2GRAY)
+            # load images and convert to grayscale
+            img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
             template_gray = cv2.cvtColor(cv2.imread(os.path.join("templates", template)), cv2.COLOR_BGR2GRAY)
 
-            res = cv2.matchTemplate(img_gray, template_gray, cv2.TM_CCOEFF_NORMED)
-            threshold = 0.8
-            loc = np.where(res >= threshold)
+            # scale template from 0.3 to 1.5 in alternating order and perform matching
+            scale_factors = [1.0, 0.9, 1.1, 0.8, 1.2, 0.7, 1.3, 0.6, 1.4, 0.5, 0.4, 0.3]
+            scaled_templates = [cv2.resize(template_gray, (0,0), fx=x, fy=x) for x in scale_factors]
 
-            for pt in zip(*loc[::-1]):
-                numberOfDetections += 1
-                #cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,255,255), 2)
+            for current_template in scaled_templates:
+                # store variables for rectangles drawn later
+                w, h = current_template.shape[::-1]
+
+                # actual template matching
+                result = cv2.matchTemplate(img_gray, current_template, cv2.TM_CCOEFF_NORMED)
+
+                # remove all matches with too low of a matching score
+                threshold = 0.7
+                loc = np.where(result >= threshold)
+                top_matches = zip(*loc[::-1])
+
+                # draw rectangle at position of first match
+                if len(top_matches) > 0:
+                    for pt in top_matches:
+                        matches += [pt]
+                        cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,255,255), 2)
+                        break #break after first point
+
+                break #break after first success
+
         else:
             print("Skipping file " + template)
 
-    return numberOfDetections
+    # if matching was successful write image with rectangles to file
+    if (len(matches) > 0):
+        dir = "detected"
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+
+        file_name = "detected/matched_" + image.get_filename().split('/')[-1]
+        cv2.imwrite(file_name, img_rgb)
+        print("Match found for " + image.__filename__)
+
+    return matches
 
 
 def load_actual_count(actual_txt_file):
@@ -180,11 +220,25 @@ if __name__ == '__main__':
 
     for pylonImage in pylon_images:
         # analyze image
-        pylonImage.set_supposed_count(match_templates(pylonImage))
+        pylonImage.set_matches(match_templates(pylonImage))
+        pylonImage.set_supposed_count(len(pylonImage.get_matches()))
         # write result to stdout TODO implement the required format
         #print(pylonImage.get_filename() + ':', pylonImage.get_supposed_count())
 
     print('Generating result...')
+
+    # write results to text file
+    result_file = open("results.txt", "w")
+    for pylon_image in pylon_images:
+        if len(pylon_image.get_matches()) > 0:
+            entry = pylon_image.get_filename() + "; "
+
+            for pt in pylon_image.get_matches():
+                entry += str(pt) + ", "
+
+            result_file.write(entry + "\n");
+
+    result_file.close();
 
     # show success rate and print detection errors
     existingPylons = 0
@@ -196,9 +250,7 @@ if __name__ == '__main__':
         if actualTxtFilePath is not None:
             existingPylons += pylonImage.get_actual_count()
 
-            if pylonImage.correctly_recognized():
-                print(pylonImage.get_filename(), ": All pylons were detected.")
-            else:
+            if not pylonImage.correctly_recognized():
                 print(pylonImage.get_filename(), "contains", pylonImage.get_actual_count(), "pylons,", pylonImage.get_supposed_count(), "were detected.")
 
         else:
@@ -208,5 +260,3 @@ if __name__ == '__main__':
         print("Overall result:", foundPylons, "of", existingPylons, "detected.")
     else:
         print("Overall result:", foundPylons, "pylons detected.")
-
-
