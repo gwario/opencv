@@ -104,31 +104,30 @@ def match_templates(image):
     return numberOfDetections
 
 
-def load_actual_count(actual_txt_file_path):
+def load_actual_count(actual_txt_file):
     """ Returns a dictionary of { filename: actual count, ... } """
 
     name_count = {}
 
-    with open(actual_txt_file_path, 'r') as actual_file:
-        for line_no, line in enumerate(actual_file):
-            line_parts = line.split(';')
+    for line_no, line in enumerate(actual_txt_file):
+        line_parts = line.split(';')
 
-            if len(line_parts) == 2:
-                name_count[line_parts[0]] = int(line_parts[1].strip())
-            else:
-                raise SyntaxError('Format error in line %d!' % line_no)
+        if len(line_parts) == 2:
+            name_count[line_parts[0]] = int(line_parts[1].strip())
+        else:
+            raise SyntaxError('Format error in line %d!' % line_no)
 
     return name_count
 
 
-def pylon_images_from_folder(img_dir_path, actual_txt_file_path):
+def pylon_images_from_folder(img_dir_path, actual_txt_file):
     """ Returns a list of PylonImages """
 
     pylon_images = []
 
     actual_counts = {}
-    if actual_txt_file_path is not None:
-        actual_counts = load_actual_count(actual_txt_file_path)
+    if actual_txt_file is not None:
+        actual_counts = load_actual_count(actual_txt_file)
 
     for filename in os.listdir(imgDirPath):
 
@@ -156,7 +155,7 @@ if __name__ == '__main__':
     import sys, os, argparse
 
     parser = argparse.ArgumentParser(description='This program detects pylons within images.')
-    parser.add_argument('--actual', help='''Compares the number of detected pylons in an image with the actual number of pylons.
+    parser.add_argument('--actual', type=argparse.FileType('r'), help='''Compares the number of detected pylons in an image with the actual number of pylons.
         The actual number of pylons is read from the file <ACTUAL>, which contains one file per line.
         The filename and the number of pylons is separated by a semicolon.''')
     parser.add_argument('imagePath', nargs=1, help='The path to the image files.')
@@ -171,11 +170,6 @@ if __name__ == '__main__':
     if not os.path.exists(imgDirPath) or not os.path.isdir(imgDirPath):
 
         print("Path to image files does not exist!")
-        sys.exit(1)
-
-    if actualTxtFilePath is None or not os.path.exists(actualTxtFilePath) or not os.path.isfile(actualTxtFilePath):
-
-        print("<ACTUAL> does not exist!")
         sys.exit(1)
 
     print('Processing PylonImages...')
