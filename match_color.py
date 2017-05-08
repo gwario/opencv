@@ -34,14 +34,14 @@ import shutil
 #dx = 8# 34 of 29
 #dy = 18
 
-dx = 8# 31 of 29
-dy = 19
+dx = 10# 31 of 29
+dy = 14
 
 maxColorGap = dy # TODO only one "unexpected" color window is allowed between the pylon color areas
 maxMatchGap = (3*dx, dy) # a 2 column distance is accepted within a real match (recognized as one pylon)
 
 # mean or average to get the color
-AVG_NOT_MEAN = True
+AVG_NOT_MEAN = False
 
 # also modify color component value ranges in color_utilities.py
 
@@ -75,13 +75,13 @@ def interpret_area(window_matrix, column_searcher):
     else:
         avg_color_per_row = numpy.mean(window_matrix, axis=0)
         avg_color = numpy.mean(avg_color_per_row, axis=0)
-    if color_utilities.is_red(avg_color):
+    if color_utilities.is_redish(avg_color):
         column_searcher.foundRed()
-    elif color_utilities.is_yellow(avg_color):
+    elif color_utilities.is_yellowish(avg_color):
         column_searcher.foundYellow()
-    elif color_utilities.is_blue(avg_color):
+    elif color_utilities.is_blueish(avg_color):
         column_searcher.foundBlue()
-    elif color_utilities.is_white(avg_color):
+    elif color_utilities.is_whiteish(avg_color):
         column_searcher.foundWhite()
     else:
         column_searcher.foundOther()
@@ -111,10 +111,13 @@ def match_color(pylon_image):
         for rowIdx in range(0, maxRows, rowStep):
             column_searcher.currentPos = (colIdx, rowIdx)
 
-            windowMatrix = pylon_image.get_image()[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
-            combine_area(colIdx, rowIdx, windowMatrix, combineWindow)
+            #doesn't really help, but makes it even slower
+            #windowMatrix = pylon_image.get_image()[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
+            #combine_area(colIdx, rowIdx, windowMatrix, combineWindow)
 
-            windowMatrix = combineWindow[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
+            #windowMatrix = combineWindow[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
+            windowMatrix = pylon_image.get_image()[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
+
             interpret_area(windowMatrix, column_searcher)
 
         # column end
@@ -170,26 +173,21 @@ def match_color(pylon_image):
     if len(previousMatch) != 0:
         real_file_matches.append(previousMatch)
 
-    # if matching was successful write image with rectangles to file
-    if (len(real_file_matches) > 0):
+    # write image with rectangles to file
+    # mark all matches with border
+    #for match in file_matches:
+    #    cv2.rectangle(combineWindow, match[0], match[1], (0, 0, 255), 1)
+    for match in real_file_matches:
+        cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0,255,255), 2)
 
-        for match in real_file_matches:
-            cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0,255,255), 2)
+    file_name = "result/"+pylon_image.get_filename().split('/')[-1]
+    cv2.imwrite(file_name, pylon_image.get_image())
 
-        file_name = "detected/matched_" + pylon_image.get_filename().split('/')[-1]
-        cv2.imwrite(file_name, pylon_image.get_image())
 
     #print(file_matches)
     #print(real_file_matches)
 
-    # mark the real matches filled
-    #for match in matches:
-    #    cv2.rectangle(combineWindow, match[0], match[1], (0, 255, 0), -1)
-
     # TODO there is a bug in the code for grouping matches, probably because the previous match marks always the first match of the real match
-    # mark all matches with border
-    #for match in file_matches:
-    #    cv2.rectangle(combineWindow, match[0], match[1], (0, 0, 255), 1)
 
     #cv2.imshow("matches", combineWindow)
     #cv2.waitKey()

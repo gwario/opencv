@@ -102,6 +102,14 @@ if __name__ == '__main__':
         shutil.rmtree(dir)
         os.makedirs(dir)
 
+    dir = "result"
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    else:
+        shutil.rmtree(dir)
+        os.makedirs(dir)
+
+
     print('Processing PylonImages...')
 
     pylon_images = pylon_images_from_folder(imgDirPath, actualTxtFilePath)

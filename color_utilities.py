@@ -8,12 +8,12 @@ lower_yellow = numpy.array([0, 130, 130])
 upper_yellow = numpy.array([120, 255, 255])
 
 lower_red = numpy.array([0, 0, 120])
-upper_red = numpy.array([150, 150, 255])
+upper_red = numpy.array([140, 140, 255])
 
 lower_green = numpy.array([0, 130, 0])
 upper_green = numpy.array([130, 255, 130])
 
-lower_white = numpy.array([140, 140, 140])
+lower_white = numpy.array([150, 150, 150])
 upper_white = numpy.array([255, 255, 255])
 
 def is_blueish(color):
