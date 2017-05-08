@@ -34,14 +34,20 @@ import shutil
 #dx = 8# 34 of 29
 #dy = 18
 
-dx = 10# 31 of 29
-dy = 14
+#dx = 10# 31 of 29
+#dy = 14
+
+#with denoise
+dx = 10# 23 of 29
+dy = 16
 
 maxColorGap = dy # TODO only one "unexpected" color window is allowed between the pylon color areas
 maxMatchGap = (3*dx, dy) # a 2 column distance is accepted within a real match (recognized as one pylon)
 
 # mean or average to get the color
 AVG_NOT_MEAN = False
+
+USE_DENOISE = False
 
 # also modify color component value ranges in color_utilities.py
 
@@ -98,7 +104,18 @@ def match_color(pylon_image):
     maxCols = len(pylon_image.get_image()[0])
     maxRows = len(pylon_image.get_image())
 
-    combineWindow = numpy.zeros((maxRows, maxCols, 3), numpy.uint8)
+    #combineWindow = numpy.zeros((maxRows, maxCols, 3), numpy.uint8)
+
+    #denoise image
+    if USE_DENOISE:
+        combineWindow = cv2.fastNlMeansDenoisingColored(pylon_image.get_image(), None, 10, 10, 13, 17)
+    else:
+        combineWindow = pylon_image.get_image()
+
+    #cv2.imshow("orig", pylon_image.get_image())
+    #cv2.imshow("deno", combineWindow)
+
+    #cv2.waitKey()
 
     file_matches = []
     # combine pixels
@@ -115,9 +132,7 @@ def match_color(pylon_image):
             #windowMatrix = pylon_image.get_image()[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
             #combine_area(colIdx, rowIdx, windowMatrix, combineWindow)
 
-            #windowMatrix = combineWindow[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
-            windowMatrix = pylon_image.get_image()[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
-
+            windowMatrix = combineWindow[rowIdx:rowIdx + dy, colIdx:colIdx + dx]
             interpret_area(windowMatrix, column_searcher)
 
         # column end
@@ -173,10 +188,11 @@ def match_color(pylon_image):
     if len(previousMatch) != 0:
         real_file_matches.append(previousMatch)
 
+
     # write image with rectangles to file
     # mark all matches with border
     #for match in file_matches:
-    #    cv2.rectangle(combineWindow, match[0], match[1], (0, 0, 255), 1)
+    #    cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0, 0, 255), 1)
     for match in real_file_matches:
         cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0,255,255), 2)
 

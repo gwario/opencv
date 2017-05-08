@@ -25,6 +25,7 @@ import match_color
 import match_templates
 import pylon_image
 import shutil
+import time
 
 
 def load_actual_count(actual_txt_file):
@@ -118,10 +119,13 @@ if __name__ == '__main__':
 
     for pylonImage in pylon_images:
         # analyze image
+        start = time.time()
         #pylonImage.set_matches(match_templates.match_templates(pylonImage))
         pylonImage.set_matches(match_color.match_color(pylonImage))
         pylonImage.set_supposed_count(len(pylonImage.get_matches()))
         #print(pylonImage.get_filename() + ':', pylonImage.get_supposed_count())
+        print("{} took {:.2f} sec to analyze.".format(pylonImage.get_filename(), (time.time() - start) % 1000))
+
 
     print('Generating result...')
 
@@ -129,7 +133,7 @@ if __name__ == '__main__':
     result_file = open("results.txt", "w")
     for pylon_image in pylon_images:
         if len(pylon_image.get_matches()) > 0:
-            entry = pylon_image.get_filename() + "; "
+            entry = "{}; {}; ".format(pylon_image.get_filename(), len(pylon_image.get_matches()))
 
             for pt in pylon_image.get_matches():
                 entry += str(pt) + ", "
