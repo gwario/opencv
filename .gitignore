@@ -3,5 +3,3 @@
 *.pyc
 detected
 results.txt
-*.png
-!templates/*.png
