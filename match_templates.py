@@ -7,6 +7,7 @@ def match_templates(image):
     Compares image to list of template images and returns the top left coordinates of the matches
     and an empty list if no template matched
     '''
+    # [[(x1, y1), (x2, y2)]
     matches = []
 
     for template in os.listdir("templates"):
@@ -36,8 +37,8 @@ def match_templates(image):
                 # draw rectangle at position of first match
                 if len(top_matches) > 0:
                     for pt in top_matches:
-                        matches += [pt]
-                        cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,255,255), 2)
+                        matches.append([pt, (pt[0] + w, pt[1] + h)])
+                        #cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,255,255), 2)
                         break #break after first point
 
                 break #break after first success
@@ -46,13 +47,13 @@ def match_templates(image):
             print("Skipping file " + template)
 
     # if matching was successful write image with rectangles to file
-    if (len(matches) > 0):
-        dir = "detected"
-        if not os.path.exists(dir):
-            os.makedirs(dir)
+    #if (len(matches) > 0):
+    #dir = "detected"
+    #if not os.path.exists(dir):
+    #    os.makedirs(dir)
 
-        file_name = "detected/matched_" + image.get_filename().split('/')[-1]
-        cv2.imwrite(file_name, img_rgb)
-        print("Match found for " + image.__filename__)
+    #file_name = "detected/" + image.get_filename().split('/')[-1]
+    #cv2.imwrite(file_name, img_rgb)
+    #print("Match found for " + image.__filename__)
 
     return matches

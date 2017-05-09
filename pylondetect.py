@@ -4,18 +4,6 @@
 This program detects pylons within images.
 
 Authors: Mario Gastegger, Fritz Meiners
-
-
-
-usage: pylondetect.py [-h] [--actual Actual] Path
-
---verify:   Compares the number of detected pylons in an image with the actual number of pylons.
-            The actual number of pylons is read from path/actual.txt
-            The format of actual.txt is as follows:
-                * One file per line
-                * <path/to/file>;<#pylons>
-
-Path:       The path to the image files.
 '''
 
 # Python 2/3 compatibility
@@ -26,6 +14,7 @@ import match_templates
 import pylon_image
 import shutil
 import time
+import cv2
 
 
 def load_actual_count(actual_txt_file):
@@ -53,25 +42,59 @@ def pylon_images_from_folder(img_dir_path, actual_txt_file):
     if actual_txt_file is not None:
         actual_counts = load_actual_count(actual_txt_file)
 
-    for filename in os.listdir(imgDirPath):
+    for path, sub_dirs, files in os.walk(img_dir_path):
 
-        if filename.endswith(".png"):
-            try:
-                pylonImage = pylon_image.PylonImage(os.path.join(img_dir_path, filename), 0)
+        for filename in files:
 
-                if filename in actual_counts:
-                    pylonImage.set_actual_count(actual_counts[filename])
+            if filename.endswith(".png"):
+                try:
+                    pylonImage = pylon_image.PylonImage(os.path.join(path, filename), 0)
 
-                pylon_images.append(pylonImage)
+                    if filename in actual_counts:
+                        pylonImage.set_actual_count(actual_counts[filename])
 
-            except (ValueError, SyntaxError):
-                print ("Failed to create PylonImage from %s" % filename)
-        else:
-            print('Skipping ', filename)
+                    pylon_images.append(pylonImage)
+
+                except (ValueError, SyntaxError):
+                    print ("Failed to create PylonImage from %s" % filename)
+            else:
+                print('Skipping ', filename)
 
     print(len(pylon_images), 'PylonImages processed.')
 
     return pylon_images
+
+
+def write_results_file(pylon_image):
+
+    entry = "{},{}".format(pylon_image.get_filename(), len(pylon_image.get_matches()))
+    for rect in pylon_image.get_matches():
+        for pt in rect:
+            entry += ",{},{}".format(pt[0], pt[1])
+    result_file.write(entry + "\n")
+
+
+def write_results_images(pylon_image):
+
+    for match in pylon_image.get_matches():
+        cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0, 0, 0), 2)
+
+    path_parts = pylon_image.get_filename().split('/')
+
+    file_name = path_parts[-1]
+    subdir = None
+
+    if len(path_parts) > 1:
+
+        subdir = "results/" + path_parts[-2]
+
+        if not os.path.exists(subdir):
+            os.makedirs(subdir)
+
+    if subdir is None:
+        cv2.imwrite(file_name, pylon_image.get_image())
+    else:
+        cv2.imwrite(subdir + "/" + file_name, pylon_image.get_image())
 
 
 if __name__ == '__main__':
@@ -83,11 +106,16 @@ if __name__ == '__main__':
         The actual number of pylons is read from the file <ACTUAL>, which contains one file per line.
         The filename and the number of pylons is separated by a semicolon.''')
     parser.add_argument('imagePath', nargs=1, help='The path to the image files.')
+    parser.add_argument('--method', required=True, help='''"color" for the color scanning + color transition state machine (takes three times longer but performs much better)
+        "template" for the template matching.''')
+    parser.add_argument('--debug', action='store_true', help='''Prints to stdout and writes the images, with matches marked, to the results directory''')
+    parser.set_defaults(feature = False)
 
     args = parser.parse_args()
 
     imgDirPath = args.imagePath[0]
     actualTxtFilePath = args.actual
+    method = args.method
 
     #print(args)
 
@@ -96,20 +124,12 @@ if __name__ == '__main__':
         print("Path to image files does not exist!")
         sys.exit(1)
 
-    dir = "detected"
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    else:
-        shutil.rmtree(dir)
-        os.makedirs(dir)
-
-    dir = "result"
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    else:
-        shutil.rmtree(dir)
-        os.makedirs(dir)
-
+    if method is None:
+        print("No method specified!")
+        sys.exit(1)
+    elif method != 'template' and method != 'color':
+        print("Invalid method!")
+        sys.exit(1)
 
     print('Processing PylonImages...')
 
@@ -120,27 +140,35 @@ if __name__ == '__main__':
     for pylonImage in pylon_images:
         # analyze image
         start = time.time()
-        #pylonImage.set_matches(match_templates.match_templates(pylonImage))
-        pylonImage.set_matches(match_color.match_color(pylonImage))
-        pylonImage.set_supposed_count(len(pylonImage.get_matches()))
-        #print(pylonImage.get_filename() + ':', pylonImage.get_supposed_count())
-        print("{} took {:.2f} sec to analyze.".format(pylonImage.get_filename(), (time.time() - start) % 1000))
+        if method == "template":
+            pylonImage.set_matches(match_templates.match_templates(pylonImage))
+        elif method == "color":
+            pylonImage.set_matches(match_color.match_color(pylonImage))
 
+        pylonImage.set_supposed_count(len(pylonImage.get_matches()))
+        if args.debug:
+            print("{}: detected {} pylons in {:.2f} sec.".format(pylonImage.get_filename(), pylonImage.get_supposed_count(), (time.time() - start) % 1000))
 
     print('Generating result...')
+
+    if args.debug:
+        resdir = "results"
+        if not os.path.exists(resdir):
+            os.makedirs(resdir)
+        else:
+            shutil.rmtree(resdir)
+            os.makedirs(resdir)
 
     # write results to text file
     result_file = open("results.txt", "w")
     for pylon_image in pylon_images:
-        if len(pylon_image.get_matches()) > 0:
-            entry = "{}; {}; ".format(pylon_image.get_filename(), len(pylon_image.get_matches()))
 
-            for pt in pylon_image.get_matches():
-                entry += str(pt) + ", "
+        write_results_file(pylon_image)
 
-            result_file.write(entry + "\n");
+        if args.debug:
+            write_results_images(pylon_image)
 
-    result_file.close();
+    result_file.close()
 
     # show success rate and print detection errors
     existingPylons = 0
@@ -156,7 +184,8 @@ if __name__ == '__main__':
                 print(pylonImage.get_filename(), "contains", pylonImage.get_actual_count(), "pylons,", pylonImage.get_supposed_count(), "were detected.")
 
         else:
-            print(pylonImage.get_filename(), ":", pylonImage.get_supposed_count(), "pylons were detected.")
+            if args.debug:
+                print(pylonImage.get_filename(), ":", pylonImage.get_supposed_count(), "pylons were detected.")
 
     if actualTxtFilePath is not None:
         print("Overall result:", foundPylons, "of", existingPylons, "detected.")
