@@ -22,7 +22,7 @@ import os
 
 # window size in pixel
 dx = 8  # 23 of 29
-dy = 8
+dy = 6
 
 max_color_gap = dy # TODO only one "unexpected" color window is allowed between the pylon color areas
 max_match_gap = (3*dx, dy) # a 2 column distance is accepted within a real match (recognized as one pylon)
@@ -157,12 +157,24 @@ def match_color(pylon_image):
         for row_idx in range(0, max_rows, row_step) if TOP_DOWN else range(max_rows, 0, -row_step):
             column_searcher.currentPos = (col_idx, row_idx)
 
+            real_start = None
+            real_end = None
             if TOP_DOWN:
-                window_matrix = img_clustered[row_idx:row_idx + dy, col_idx:col_idx + dx]
+                real_start = column_searcher.currentPos
+                real_end = (col_idx + dx, min(row_idx + dy, max_rows))
             else:
-                window_matrix = img_clustered[(row_idx - dy):row_idx, col_idx:col_idx + dx]
+                real_start = (col_idx, max(row_idx - dy, 0))
+                real_end = (col_idx + dx, row_idx)
+
+            print("real_start", real_start)
+            print("real_end", real_end)
+
+            window_matrix = img_clustered[real_start[1]:real_end[1], real_start[0]:real_end[0]]
             #print("img_clustered", img_clustered)
             #print("window_matrix", window_matrix)
+
+            cv2.rectangle(pylon_image.get_image(), real_start, real_end, (0, 0, 0), 1)
+
 
             # doesn't really help, but makes it even slower
             #window_matrix = img_clustered[row_idx:row_idx + dy, col_idx:col_idx + dx]
@@ -171,7 +183,10 @@ def match_color(pylon_image):
             interpret_area(window_matrix, column_searcher, color_utilities.MODE_HSV)
 
         # column end
-        column_searcher.currentPos = (col_idx, max_rows)  # if the match goes to the end of the column we set to the last pixel
+        if TOP_DOWN:
+            column_searcher.currentPos = (col_idx, max_rows)  # if the match goes to the end of the column we set to the last pixel
+        else:
+            column_searcher.currentPos = (col_idx, 0)  # if the match goes to the start of the column we set to the first pixel
         column_searcher.foundColumnEnd()
 
         file_matches.extend(column_searcher.matches)
@@ -186,7 +201,7 @@ def match_color(pylon_image):
     cv2.imshow("clustered", cv2.cvtColor(img_clustered, cv2.COLOR_HSV2BGR))
     #print(file_matches)
     for match in file_matches:
-        cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0, 0, 0), 1)
+        cv2.rectangle(pylon_image.get_image(), match[0], match[1], (255, 0, 0), 1)
     for match in real_file_matches:
         cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0, 255, 255), 1)
     cv2.imshow("matches", pylon_image.get_image())
@@ -224,13 +239,9 @@ def group_matches(col_step, file_matches):
             #print("dist:", get_x_distance(previous_match_start, currentMatchStart), ", maxgap:", max_match_gap[0], "+", match_end_offset)
             if get_x_distance(previous_match_start, currentMatchStart) <= max_match_gap[0] + match_end_offset:
                 # extend previous match start and end
-                if TOP_DOWN:
-                    previous_match[0] = (previous_match_start[0], min(currentMatchStart[1], previous_match_start[1]))
-                    previous_match[1] = (currentMatchEnd[0], max(currentMatchEnd[1], previous_matchEnd[1]))
-                else:
-                    previous_match[0] = (previous_match_start[0], max(currentMatchStart[1], previous_match_start[1]))
-                    previous_match[1] = (currentMatchEnd[0], min(currentMatchEnd[1], previous_matchEnd[1]))
-
+                previous_match[0] = (previous_match_start[0], min(currentMatchStart[1], previous_match_start[1]))
+                previous_match[1] = (currentMatchEnd[0], max(currentMatchEnd[1], previous_matchEnd[1]))
+            
                 match_combination_count += 1
             else:
                 # add real match
