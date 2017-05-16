@@ -13,7 +13,6 @@ from __future__ import print_function
 
 import cv2
 import numpy
-import colorsys
 import statemachine
 import color_utilities
 import sys
@@ -87,6 +86,11 @@ def interpret_area(window_matrix, column_searcher, cspace = color_utilities.MODE
         avg_color_per_row = numpy.mean(window_matrix, axis=0)
         avg_color = numpy.mean(avg_color_per_row, axis=0)
 
+    # TODO this avg/mean does not work at all for hsv since the h component has red on the lower and also the upper end
+    # so lets just try to use the color of the center pixel
+    if cspace == color_utilities.MODE_HSV:
+        avg_color = window_matrix[len(window_matrix) / 2][len(window_matrix[0]) / 2]
+
     if color_utilities.is_redish(avg_color, cspace):
         column_searcher.foundRed()
     elif color_utilities.is_yellowish(avg_color, cspace):
@@ -118,7 +122,7 @@ def match_color(pylon_image):
 
     if USE_KMEANS:
         img_clustered = pylon_image.get_image()
-        Z = img_clustered.reshape((-1,3))
+        Z = img_clustered.reshape((-1, 3))
 
         # convert to np.float32
         Z = numpy.float32(Z)
@@ -126,7 +130,7 @@ def match_color(pylon_image):
         # define criteria, number of clusters(K) and apply kmeans()
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
         K = 25
-        ret,label,center=cv2.kmeans(Z,K,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
+        ret, label, center=cv2.kmeans(Z, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
 
         # Now convert back into uint8, and make original image
         center = numpy.uint8(center)
@@ -137,6 +141,9 @@ def match_color(pylon_image):
 
     img_clustered = cv2.cvtColor(img_clustered, cv2.COLOR_BGR2HSV)
 
+    #print(img_clustered)
+    #print(col_step, row_step, max_cols, max_rows)
+
     file_matches = []
     for col_idx in range(0, max_cols, col_step):
 
@@ -144,14 +151,23 @@ def match_color(pylon_image):
         column_searcher.dx = dx
         column_searcher.dy = dy
 
+        #print("Top down", range(0, max_rows, row_step))
+        #print("Bottom up", range(max_rows, 0, -row_step))
+
         for row_idx in range(0, max_rows, row_step) if TOP_DOWN else range(max_rows, 0, -row_step):
             column_searcher.currentPos = (col_idx, row_idx)
+
+            if TOP_DOWN:
+                window_matrix = img_clustered[row_idx:row_idx + dy, col_idx:col_idx + dx]
+            else:
+                window_matrix = img_clustered[(row_idx - dy):row_idx, col_idx:col_idx + dx]
+            #print("img_clustered", img_clustered)
+            #print("window_matrix", window_matrix)
 
             # doesn't really help, but makes it even slower
             #window_matrix = img_clustered[row_idx:row_idx + dy, col_idx:col_idx + dx]
             #combine_area(col_idx, row_idx, window_matrix, img_clustered, color_utilities.MODE_HSV)
 
-            window_matrix = img_clustered[row_idx:row_idx + dy, col_idx:col_idx + dx]
             interpret_area(window_matrix, column_searcher, color_utilities.MODE_HSV)
 
         # column end
@@ -189,6 +205,7 @@ def group_matches(col_step, file_matches):
     real_file_matches = []
     previous_match = []
     match_combination_count = 0
+    print("file_matches", file_matches)
     for match in list(file_matches):
         # match = [(,),(,)]
         if len(previous_match) == 0:
@@ -203,7 +220,8 @@ def group_matches(col_step, file_matches):
 
             match_end_offset = match_combination_count * (col_step + dx)
 
-            # print("dist:", get_x_distance(previous_match_start, currentMatchStart), ", maxgap:", max_match_gap[0], "+", match_end_offset)
+            #print("previous_match_start", previous_match_start, "currentMatchStart", currentMatchStart)
+            #print("dist:", get_x_distance(previous_match_start, currentMatchStart), ", maxgap:", max_match_gap[0], "+", match_end_offset)
             if get_x_distance(previous_match_start, currentMatchStart) <= max_match_gap[0] + match_end_offset:
                 # extend previous match start and end
                 if TOP_DOWN:

@@ -178,7 +178,7 @@ class MatchSearcher(object):
             self.machine.add_transition(source='WhiteBlueYellowDetected', trigger='foundOther',  dest='Searching',      before='addMatch')
             self.machine.add_transition(source='WhiteBlueYellowDetected', trigger='foundColumnEnd', dest='Searching',   before='addMatch')
 
-
+    #TODO the matches at the coulumn end are a problem
     def addMatch(self):
         #self.rememberEnd()
         # if we are at the end of the column, us the last pixel
@@ -186,7 +186,10 @@ class MatchSearcher(object):
             if self.matchEnd is None:
                 self.matchEnd = self.currentPos
         else:
-            self.matchEnd = (self.currentPos[0]+self.dx, self.currentPos[1]+self.dy)
+            if self.topdown:#TODO does work without this???
+                self.matchEnd = (self.currentPos[0]+self.dx, self.currentPos[1]+self.dy)
+            else:
+                self.matchEnd = (self.currentPos[0]+self.dx, self.currentPos[1]-self.dy)
 
         #print("Start:", self.matchStart)
         #print("End:", self.matchEnd)
@@ -197,7 +200,11 @@ class MatchSearcher(object):
 
     def rememberEnd(self):
         #print("Possible end")
-        self.matchEnd = (self.currentPos[0]+self.dx, self.currentPos[1]+self.dy)
+        if self.topdown:#TODO does work without this???
+            self.matchEnd = (self.currentPos[0]+self.dx, self.currentPos[1]+self.dy)
+        else:
+            self.matchEnd = (self.currentPos[0]+self.dx, self.currentPos[1]-self.dy)
+
 
     def rememberStart(self):
         #print("Possible start")
