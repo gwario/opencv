@@ -31,22 +31,39 @@ max_match_gap = (3*dx, dy) # a 2 column distance is accepted within a real match
 AVG_NOT_MEAN = False
 
 USE_DENOISE = False
-USE_KMEANS = True
+USE_KMEANS = False
 TOP_DOWN = False
 
 # also modify color component value ranges in color_utilities.py
 
 
-def combine_area(col_idx, row_idx, window_matrix, img, cspace = color_utilities.MODE_RGB):
+def get_avg_color_rgb(window_matrix):
+
+    avg_color_per_row = numpy.average(window_matrix, axis=0)
+    return numpy.average(avg_color_per_row, axis=0).astype(numpy.uint8)
+
+
+def get_mean_color_rgb(window_matrix):
+    avg_color_per_row = numpy.median(window_matrix, axis=0)
+    return numpy.median(avg_color_per_row, axis=0).astype(numpy.uint8)
+
+
+def combine_area(col_idx, row_idx, window_matrix, img, cspace=color_utilities.MODE_RGB):
     """x,y, the area and the output image"""
 
-    if AVG_NOT_MEAN:
-        avg_color_per_row = numpy.average(window_matrix, axis=0)
-        avg_color = numpy.average(avg_color_per_row, axis=0)
-    else:
-        avg_color_per_row = numpy.median(window_matrix, axis=0)
-        avg_color = numpy.median(avg_color_per_row, axis=0)
+    if cspace == color_utilities.MODE_RGB:
+        if AVG_NOT_MEAN:
+            avg_color = get_avg_color_rgb(window_matrix)
+        else:
+            avg_color = get_mean_color_rgb(window_matrix)
 
+    elif cspace == color_utilities.MODE_HSV:
+        if AVG_NOT_MEAN:
+            avg_color = cv2.cvtColor(numpy.array([get_avg_color_rgb(cv2.cvtColor(numpy.array(window_matrix), cv2.COLOR_HSV2BGR))]), cv2.COLOR_BGR2HSV)
+        else:
+            rgb_window = cv2.cvtColor(numpy.array(window_matrix), cv2.COLOR_HSV2BGR)
+            avg_color_rgb = get_mean_color_rgb(rgb_window)
+            avg_color = cv2.cvtColor(numpy.array([[avg_color_rgb]]), cv2.COLOR_BGR2HSV)[0][0]
 
     if cspace == color_utilities.MODE_RGB:
 
@@ -61,44 +78,46 @@ def combine_area(col_idx, row_idx, window_matrix, img, cspace = color_utilities.
 
     elif cspace == color_utilities.MODE_HSV:
 
-        color_red = (0, 255, 255)
-        color_yellow = (30, 255, 255)
-        color_blue = (120, 255, 255)
-        color_white = (0, 0, 255)
+        color_red = (0, 200, 230)
+        color_yellow = (25, 180, 250)
+        color_blue = (120, 200, 200)
+        color_white = (35, 0, 255)
 
     if color_utilities.is_redish(avg_color, cspace):
         cv2.rectangle(img, (col_idx, row_idx), (col_idx + dx, row_idx + dy), color_red, -1)
+    elif color_utilities.is_whiteish(avg_color, cspace):
+        cv2.rectangle(img, (col_idx, row_idx), (col_idx + dx, row_idx + dy), color_white, -1)
     elif color_utilities.is_yellowish(avg_color, cspace):
         cv2.rectangle(img, (col_idx, row_idx), (col_idx + dx, row_idx + dy), color_yellow, -1)
     elif color_utilities.is_blueish(avg_color, cspace):
         cv2.rectangle(img, (col_idx, row_idx), (col_idx + dx, row_idx + dy), color_blue, -1)
-    elif color_utilities.is_whiteish(avg_color, cspace):
-        cv2.rectangle(img, (col_idx, row_idx), (col_idx + dx, row_idx + dy), color_white, -1)
 
 
 def interpret_area(window_matrix, column_searcher, cspace = color_utilities.MODE_RGB):
     """the area, the state machine"""
 
-    if AVG_NOT_MEAN:
-        avg_color_per_row = numpy.average(window_matrix, axis=0)
-        avg_color = numpy.average(avg_color_per_row, axis=0)
-    else:
-        avg_color_per_row = numpy.mean(window_matrix, axis=0)
-        avg_color = numpy.mean(avg_color_per_row, axis=0)
+    if cspace == color_utilities.MODE_RGB:
+        if AVG_NOT_MEAN:
+            avg_color = get_avg_color_rgb(window_matrix)
+        else:
+            avg_color = get_mean_color_rgb(window_matrix)
 
-    # TODO this avg/mean does not work at all for hsv since the h component has red on the lower and also the upper end
-    # so lets just try to use the color of the center pixel
-    if cspace == color_utilities.MODE_HSV:
-        avg_color = window_matrix[len(window_matrix) / 2][len(window_matrix[0]) / 2]
+    elif cspace == color_utilities.MODE_HSV:
+        if AVG_NOT_MEAN:
+            avg_color = cv2.cvtColor(numpy.array([get_avg_color_rgb(cv2.cvtColor(numpy.array(window_matrix), cv2.COLOR_HSV2BGR))]), cv2.COLOR_BGR2HSV)
+        else:
+            rgb_window = cv2.cvtColor(numpy.array(window_matrix), cv2.COLOR_HSV2BGR)
+            avg_color_rgb = get_mean_color_rgb(rgb_window)
+            avg_color = cv2.cvtColor(numpy.array([[avg_color_rgb]]), cv2.COLOR_BGR2HSV)[0][0]
 
     if color_utilities.is_redish(avg_color, cspace):
         column_searcher.foundRed()
+    elif color_utilities.is_whiteish(avg_color, cspace):
+        column_searcher.foundWhite()
     elif color_utilities.is_yellowish(avg_color, cspace):
         column_searcher.foundYellow()
     elif color_utilities.is_blueish(avg_color, cspace):
         column_searcher.foundBlue()
-    elif color_utilities.is_whiteish(avg_color, cspace):
-        column_searcher.foundWhite()
     else:
         column_searcher.foundOther()
 
@@ -141,8 +160,8 @@ def match_color(pylon_image):
 
     img_clustered = cv2.cvtColor(img_clustered, cv2.COLOR_BGR2HSV)
 
-    #print(img_clustered)
-    #print(col_step, row_step, max_cols, max_rows)
+    # print(img_clustered)
+    # print(col_step, row_step, max_cols, max_rows)
 
     file_matches = []
     for col_idx in range(0, max_cols, col_step):
@@ -151,14 +170,12 @@ def match_color(pylon_image):
         column_searcher.dx = dx
         column_searcher.dy = dy
 
-        #print("Top down", range(0, max_rows, row_step))
-        #print("Bottom up", range(max_rows, 0, -row_step))
+        # print("Top down", range(0, max_rows, row_step))
+        # print("Bottom up", range(max_rows, 0, -row_step))
 
         for row_idx in range(0, max_rows, row_step) if TOP_DOWN else range(max_rows, 0, -row_step):
             column_searcher.currentPos = (col_idx, row_idx)
 
-            real_start = None
-            real_end = None
             if TOP_DOWN:
                 real_start = column_searcher.currentPos
                 real_end = (col_idx + dx, min(row_idx + dy, max_rows))
@@ -166,19 +183,16 @@ def match_color(pylon_image):
                 real_start = (col_idx, max(row_idx - dy, 0))
                 real_end = (col_idx + dx, row_idx)
 
-            print("real_start", real_start)
-            print("real_end", real_end)
+            # print("real_start", real_start)
+            # print("real_end", real_end)
 
             window_matrix = img_clustered[real_start[1]:real_end[1], real_start[0]:real_end[0]]
-            #print("img_clustered", img_clustered)
-            #print("window_matrix", window_matrix)
-
+            # print("img_clustered", img_clustered)
+            # print("window_matrix", window_matrix)
             cv2.rectangle(pylon_image.get_image(), real_start, real_end, (0, 0, 0), 1)
 
-
             # doesn't really help, but makes it even slower
-            #window_matrix = img_clustered[row_idx:row_idx + dy, col_idx:col_idx + dx]
-            #combine_area(col_idx, row_idx, window_matrix, img_clustered, color_utilities.MODE_HSV)
+            combine_area(col_idx, row_idx, window_matrix, img_clustered, color_utilities.MODE_HSV)
 
             interpret_area(window_matrix, column_searcher, color_utilities.MODE_HSV)
 
@@ -198,20 +212,17 @@ def match_color(pylon_image):
     real_file_matches = group_matches(col_step, file_matches)
 
 
-    cv2.imshow("clustered", cv2.cvtColor(img_clustered, cv2.COLOR_HSV2BGR))
+
     #print(file_matches)
     for match in file_matches:
         cv2.rectangle(pylon_image.get_image(), match[0], match[1], (255, 0, 0), 1)
     for match in real_file_matches:
         cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0, 255, 255), 1)
-    cv2.imshow("matches", pylon_image.get_image())
+    cv2.imshow("result", numpy.hstack((cv2.cvtColor(img_clustered, cv2.COLOR_HSV2BGR), pylon_image.get_image())))
     cv2.waitKey()
 
     # print(file_matches)
     # print(real_file_matches)
-
-    # TODO there is a bug in the code for grouping matches, probably because the previous match marks always the first match of the real match
-
     return real_file_matches
 
 
@@ -241,7 +252,7 @@ def group_matches(col_step, file_matches):
                 # extend previous match start and end
                 previous_match[0] = (previous_match_start[0], min(currentMatchStart[1], previous_match_start[1]))
                 previous_match[1] = (currentMatchEnd[0], max(currentMatchEnd[1], previous_matchEnd[1]))
-            
+
                 match_combination_count += 1
             else:
                 # add real match
