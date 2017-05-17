@@ -155,7 +155,7 @@ def match_color(pylon_image):
         center = numpy.uint8(center)
         res = center[label.flatten()]
         res2 = res.reshape((img_clustered.shape))
-        cv2.imshow("kmeans", res2)
+        #cv2.imshow("kmeans", res2)
         img_clustered = res2
 
     img_clustered = cv2.cvtColor(img_clustered, cv2.COLOR_BGR2HSV)
@@ -218,8 +218,8 @@ def match_color(pylon_image):
         cv2.rectangle(pylon_image.get_image(), match[0], match[1], (255, 0, 0), 1)
     for match in real_file_matches:
         cv2.rectangle(pylon_image.get_image(), match[0], match[1], (0, 255, 255), 1)
-    cv2.imshow("result", numpy.hstack((cv2.cvtColor(img_clustered, cv2.COLOR_HSV2BGR), pylon_image.get_image())))
-    cv2.waitKey()
+    #cv2.imshow("result", numpy.hstack((cv2.cvtColor(img_clustered, cv2.COLOR_HSV2BGR), pylon_image.get_image())))
+    #cv2.waitKey()
 
     # print(file_matches)
     # print(real_file_matches)
@@ -231,7 +231,7 @@ def group_matches(col_step, file_matches):
     real_file_matches = []
     previous_match = []
     match_combination_count = 0
-    print("file_matches", file_matches)
+    #print("file_matches", file_matches)
     for match in list(file_matches):
         # match = [(,),(,)]
         if len(previous_match) == 0:

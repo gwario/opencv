@@ -9,12 +9,14 @@ class MatchSearcher(object):
     dx = None
     dy = None
 
-    def __init__(self, filename, topdown = True):
+    def __init__(self, filename, topdown=True, wrong_color_block_limit=1):
 
         self.topdown = topdown
 
         self.filename = filename
 
+        self.wrongColorCountLimit = wrong_color_block_limit
+        self.wrongColorCount = 0
         self.matchStart = None
         self.matchEnd = None
         self.matches = []
@@ -117,29 +119,29 @@ class MatchSearcher(object):
             self.machine.add_transition(source='WhiteDetected', trigger='foundYellow', dest='WhiteYellowDetected')
             self.machine.add_transition(source='WhiteDetected', trigger='foundBlue',   dest='WhiteBlueDetected')
             self.machine.add_transition(source='WhiteDetected', trigger='foundWhite',  dest='WhiteDetected')
-            self.machine.add_transition(source='WhiteDetected', trigger='foundOther',  dest='Searching')
+            self.machine.add_transition(source='WhiteDetected', trigger='foundOther',  dest='Searching',                before='inc_wrong_color_count', conditions='wrong_color_limit_reached', after='reset_wrong_color_count')
             self.machine.add_transition(source='WhiteDetected', trigger='foundColumnEnd', dest='Searching')
 
             #
-            self.machine.add_transition(source='WhiteRedDetected', trigger='foundRed',    dest='WhiteRedDetected')
-            self.machine.add_transition(source='WhiteRedDetected', trigger='foundYellow', dest='WhiteRedYellowDetected', before='rememberStart')
-            self.machine.add_transition(source='WhiteRedDetected', trigger='foundBlue',   dest='WhiteRedBlueDetected',  before='rememberStart')
-            self.machine.add_transition(source='WhiteRedDetected', trigger='foundWhite',  dest='WhiteDetected',         before='rememberEnd')
-            self.machine.add_transition(source='WhiteRedDetected', trigger='foundOther',  dest='Searching')
+            self.machine.add_transition(source='WhiteRedDetected', trigger='foundRed',    dest='WhiteRedDetected')  #TODO we are missing ends...
+            self.machine.add_transition(source='WhiteRedDetected', trigger='foundYellow', dest='WhiteRedYellowDetected', before=['rememberStart','reset_wrong_color_count'])
+            self.machine.add_transition(source='WhiteRedDetected', trigger='foundBlue',   dest='WhiteRedBlueDetected',  before=['rememberStart', 'reset_wrong_color_count'])
+            self.machine.add_transition(source='WhiteRedDetected', trigger='foundWhite',  dest='WhiteDetected',         before='inc_wrong_color_count', conditions='wrong_color_limit_reached', after=['rememberEnd', 'reset_wrong_color_count'])
+            self.machine.add_transition(source='WhiteRedDetected', trigger='foundOther',  dest='Searching',             before='inc_wrong_color_count', conditions='wrong_color_limit_reached', after='reset_wrong_color_count')
             self.machine.add_transition(source='WhiteRedDetected', trigger='foundColumnEnd', dest='Searching')
 
-            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundRed',    dest='WhiteYellowRedDetected', before='rememberStart')
-            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundYellow', dest='WhiteYellowDetected')
-            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundBlue',   dest='WhiteYellowBlueDetected', before='rememberStart')
-            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundWhite',  dest='WhiteDetected',      before='rememberEnd')
-            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundOther',  dest='Searching')
+            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundRed',    dest='WhiteYellowRedDetected', before=['rememberStart', 'reset_wrong_color_count'])
+            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundYellow', dest='WhiteYellowDetected',after='reset_wrong_color_count')
+            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundBlue',   dest='WhiteYellowBlueDetected', before=['rememberStart', 'reset_wrong_color_count'])
+            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundWhite',  dest='WhiteDetected',      before='inc_wrong_color_count', conditions='wrong_color_limit_reached', after=['rememberEnd', 'reset_wrong_color_count'])
+            self.machine.add_transition(source='WhiteYellowDetected', trigger='foundOther',  dest='Searching',          before='inc_wrong_color_count', conditions='wrong_color_limit_reached', after='reset_wrong_color_count')
             self.machine.add_transition(source='WhiteYellowDetected', trigger='foundColumnEnd', dest='Searching')
 
-            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundRed',    dest='Searching')
-            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundYellow', dest='WhiteBlueYellowDetected', before='rememberStart')
-            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundBlue',   dest='WhiteBlueDetected')
-            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundWhite',  dest='WhiteDetected',        before='rememberEnd')
-            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundOther',  dest='Searching')
+            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundRed',    dest='Searching',            before='inc_wrong_color_count', conditions='wrong_color_limit_reached', after='reset_wrong_color_count')
+            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundYellow', dest='WhiteBlueYellowDetected', before=['rememberStart', 'reset_wrong_color_count'])
+            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundBlue',   dest='WhiteBlueDetected',    after='reset_wrong_color_count')
+            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundWhite',  dest='WhiteDetected',        before='inc_wrong_color_count', conditions='wrong_color_limit_reached', after=['rememberEnd', 'reset_wrong_color_count'])
+            self.machine.add_transition(source='WhiteBlueDetected', trigger='foundOther',  dest='Searching',            before='inc_wrong_color_count', conditions='wrong_color_limit_reached', after='reset_wrong_color_count')
             self.machine.add_transition(source='WhiteBlueDetected', trigger='foundColumnEnd', dest='Searching')
 
             #
@@ -177,6 +179,19 @@ class MatchSearcher(object):
             self.machine.add_transition(source='WhiteBlueYellowDetected', trigger='foundWhite',  dest='WhiteDetected',  before='addMatch')
             self.machine.add_transition(source='WhiteBlueYellowDetected', trigger='foundOther',  dest='Searching',      before='addMatch')
             self.machine.add_transition(source='WhiteBlueYellowDetected', trigger='foundColumnEnd', dest='Searching',   before='addMatch')
+
+    def inc_wrong_color_count(self):
+        self.wrongColorCount += 1
+        #print("inc wrong count: ", self.wrongColorCount)
+
+    def reset_wrong_color_count(self):
+        self.wrongColorCount = 0
+        #print("rst wrong count")
+
+    def wrong_color_limit_reached(self):
+        #print("wrong count reached: ", self.wrongColorCount > self.wrongColorCountLimit)
+        self.inc_wrong_color_count()#TODO bug: count gets 3, even though 2 should be the max
+        return self.wrongColorCount > self.wrongColorCountLimit
 
     def addMatch(self):
         #self.rememberEnd()
